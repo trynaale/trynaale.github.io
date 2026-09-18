@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Chinese Listener</title>
+
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="听">
+<meta name="theme-color" content="#000000">
+
+<style>
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html,
+body {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  min-height: 100%;
+  background: #000;
+  color: #fff;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display",
+    "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
+}
+
+body {
+  min-height: 100dvh;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+input {
+  font: inherit;
+}
+
+/*
+  IMPORTANT:
+  The whole working UI is pinned to the TOP of the screen.
+  Nothing is positioned relative to the bottom or 50% of viewport height,
+  so opening the iPhone keyboard does not pull the controls into it.
+*/
+.workspace {
+  position: fixed;
+  left: 22px;
+  right: 22px;
+  top: calc(env(safe-area-inset-top) + 34px);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  z-index: 2;
+}
+
+/* SPEED FIRST */
+.speed-box {
+  width: 100%;
+  padding: 14px 15px 12px;
+  border: 1px solid rgba(255,255,255,.72);
+  border-radius: 14px;
+  background: rgba(255,255,255,.06);
+}
+
+.speed-head,
+.speed-scale {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.speed-head {
+  margin-bottom: 10px;
+  font-size: 14px;
+}
+
+#speedValue {
+  color: rgba(255,255,255,.52);
+  font-variant-numeric: tabular-nums;
+}
+
+.speed-scale {
+  margin-top: 5px;
+  color: rgba(255,255,255,.35);
+  font-size: 10px;
+}
+
+.speed-slider {
+  height: 28px;
+  display: flex;
+  align-items: center;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.speed-track {
+  position: relative;
+  width: 100%;
+  height: 2px;
+  border-radius: 999px;
+  background: rgba(255,255,255,.45);
+}
+
+.speed-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 2px;
+  border-radius: 999px;
+  background: rgba(255,255,255,.9);
+}
+
+.speed-thumb {
+  position: absolute;
+  left: 100%;
+  top: 50%;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #fff;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+/* REPEAT SECOND */
+.repeat {
+  width: 100%;
+  min-height: 56px;
+  border: 1px solid rgba(255,255,255,.72);
+  border-radius: 14px;
+  background: rgba(255,255,255,.06);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  -webkit-user-select: none;
+  user-select: none;
+  touch-action: manipulation;
+}
+
+.repeat.active {
+  background: #fff;
+  color: #000;
+  border-color: #fff;
+}
+
+.repeat-icon {
+  font-size: 21px;
+  line-height: 1;
+}
+
+/* TEXT INPUT LAST */
+.input-zone {
+  width: 100%;
+}
+
+#word {
+  display: block;
+  width: 100%;
+  height: 66px;
+  padding: 0 18px;
+  border: 1.5px solid #fff;
+  border-radius: 15px;
+  outline: none;
+  background: transparent;
+  color: #fff;
+  font-size: 25px;
+  line-height: 1;
+  text-align: center;
+  caret-color: #fff;
+  box-shadow: none;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+#word::placeholder {
+  color: rgba(255,255,255,.27);
+}
+
+#word:focus {
+  border-width: 2px;
+}
+
+.hint {
+  min-height: 17px;
+  margin: 9px 4px 0;
+  color: rgba(255,255,255,.52);
+  text-align: center;
+  font-size: 12px;
+}
+
+/*
+  Intentionally empty lower half.
+  On the user's iPhone, keyboard + accessory bar occupy about 43%
+  of the physical screen from the bottom.
+*/
+.keyboard-reserved-space {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 45vh;
+  pointer-events: none;
+}
+
+/* Compact fallback for shorter iPhones */
+@media (max-height: 700px) {
+  .workspace {
+    top: calc(env(safe-area-inset-top) + 18px);
+    gap: 12px;
+  }
+
+  .speed-box {
+    padding-top: 10px;
+    padding-bottom: 9px;
+  }
+
+  .repeat {
+    min-height: 50px;
+  }
+
+  #word {
+    height: 60px;
+  }
+}
+</style>
+</head>
+
+<body>
+
+<div class="workspace">
+  <div class="speed-box">
+    <div class="speed-head">
+      <span>Скорость</span>
+      <span id="speedValue">100%</span>
+    </div>
+
+    <div class="speed-slider" id="speedSlider">
+      <div class="speed-track">
+        <div class="speed-fill" id="speedFill"></div>
+        <div class="speed-thumb" id="speedThumb"></div>
+      </div>
+    </div>
+
+    <div class="speed-scale">
+      <span>20%</span>
+      <span>100%</span>
+    </div>
+  </div>
+
+  <!-- div instead of button: it does not take focus away from the text input -->
+  <div class="repeat" id="repeatButton">
+    <span class="repeat-icon">↻</span>
+    <span id="repeatLabel">Повторять</span>
+  </div>
+
+  <div class="input-zone">
+    <input
+      id="word"
+      placeholder="输入中文"
+      autocomplete="off"
+      autocorrect="off"
+      autocapitalize="off"
+      spellcheck="false"
+      enterkeyhint="go"
+      lang="zh-CN"
+    >
+    <div class="hint" id="hint"></div>
+  </div>
+</div>
+
+<div class="keyboard-reserved-space" aria-hidden="true"></div>
+
+<script>
+(() => {
+  "use strict";
+
+  /* Clean up service workers/caches from earlier builds on the same Netlify URL. */
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.getRegistrations()
+      .then(regs => regs.forEach(reg => reg.unregister()))
+      .catch(() => {});
+  }
+
+  if ("caches" in window) {
+    caches.keys()
+      .then(keys => Promise.all(keys.map(key => caches.delete(key))))
+      .catch(() => {});
+  }
+
+  const input = document.getElementById("word");
+  const hint = document.getElementById("hint");
+
+  const repeatButton = document.getElementById("repeatButton");
+  const repeatLabel = document.getElementById("repeatLabel");
+
+  const speedSlider = document.getElementById("speedSlider");
+  const speedFill = document.getElementById("speedFill");
+  const speedThumb = document.getElementById("speedThumb");
+  const speedValue = document.getElementById("speedValue");
+
+  const synth = window.speechSynthesis;
+
+  const REPEAT_DELAY = 1000;
+  const MIN_SPEED = 20;
+  const MAX_SPEED = 100;
+
+  let voices = [];
+  let speed = 100;
+  let repeating = false;
+  let repeatTimer = null;
+  let repeatGeneration = 0;
+  let dragging = false;
+
+  function clamp(v, min, max) {
+    return Math.min(max, Math.max(min, v));
+  }
+
+  function loadVoices() {
+    voices = synth ? synth.getVoices() : [];
+  }
+
+  function mandarinVoice() {
+    if (!voices.length) loadVoices();
+
+    const chinese = v => /^zh/i.test(v.lang || "");
+
+    const han = voices.find(v => {
+      const identity = (v.name || "") + " " + (v.voiceURI || "");
+      return chinese(v) &&
+        /(^|[\s_-])han([\s_-]|$)|漢|汉|х[аa]нь/i.test(identity);
+    });
+
+    if (han) return han;
+
+    return voices.find(v => /^zh[-_]CN$/i.test(v.lang || "")) ||
+           voices.find(v => /^zh[-_]Hans/i.test(v.lang || "")) ||
+           voices.find(chinese) ||
+           null;
+  }
+
+  function stopAudio() {
+    repeatGeneration++;
+    clearTimeout(repeatTimer);
+    repeatTimer = null;
+
+    if (synth && (synth.speaking || synth.pending)) {
+      synth.cancel();
+    }
+  }
+
+  function setRepeatUI(on) {
+    repeating = on;
+    repeatButton.classList.toggle("active", on);
+    repeatLabel.textContent = on ? "Остановить" : "Повторять";
+  }
+
+  function speak(text, done) {
+    const value = text.trim();
+
+    if (!value) {
+      hint.textContent = "Введите китайский текст";
+      if (done) done();
+      return;
+    }
+
+    hint.textContent = "";
+
+    if (!synth || !window.SpeechSynthesisUtterance) {
+      hint.textContent = "Озвучивание недоступно";
+      if (done) done();
+      return;
+    }
+
+    const utterance = new SpeechSynthesisUtterance(value);
+    const voice = mandarinVoice();
+
+    utterance.lang = voice ? voice.lang : "zh-CN";
+    if (voice) utterance.voice = voice;
+
+    utterance.rate = speed / 100;
+    utterance.pitch = 1;
+    utterance.volume = 1;
+
+    let finished = false;
+
+    const finish = () => {
+      if (finished) return;
+      finished = true;
+      if (done) done();
+    };
+
+    utterance.onend = finish;
+    utterance.onerror = finish;
+
+    synth.cancel();
+    synth.resume();
+    synth.speak(utterance);
+  }
+
+  function speakOnce() {
+    stopAudio();
+    setRepeatUI(false);
+    speak(input.value);
+  }
+
+  function startRepeat() {
+    if (!input.value.trim()) {
+      hint.textContent = "Введите китайский текст";
+      return;
+    }
+
+    stopAudio();
+    setRepeatUI(true);
+
+    const generation = repeatGeneration;
+
+    function cycle() {
+      if (!repeating || generation !== repeatGeneration) return;
+
+      const text = input.value.trim();
+
+      if (!text) {
+        setRepeatUI(false);
+        return;
+      }
+
+      speak(text, () => {
+        if (!repeating || generation !== repeatGeneration) return;
+        repeatTimer = setTimeout(cycle, REPEAT_DELAY);
+      });
+    }
+
+    cycle();
+  }
+
+  function stopRepeat() {
+    setRepeatUI(false);
+    stopAudio();
+  }
+
+  /*
+    Go:
+    speak once, but keep the input focused.
+    preventDefault prevents Enter from triggering any browser-default action.
+  */
+  input.addEventListener("keydown", event => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      speakOnce();
+    }
+  });
+
+  input.addEventListener("input", () => {
+    if (input.value.trim()) {
+      hint.textContent = "";
+    }
+  });
+
+  /*
+    IMPORTANT FOR THE NEW WORKFLOW:
+    Repeat is a non-focusable DIV.
+    Preventing pointer default means touching it will not steal focus
+    from the input, so the iPhone keyboard stays open.
+  */
+  repeatButton.addEventListener("pointerdown", event => {
+    event.preventDefault();
+
+    if (repeating) {
+      stopRepeat();
+    } else {
+      startRepeat();
+    }
+  });
+
+  function setSpeed(value) {
+    speed = Math.round(clamp(value, MIN_SPEED, MAX_SPEED) / 5) * 5;
+
+    const fraction = (speed - MIN_SPEED) / (MAX_SPEED - MIN_SPEED);
+    const pct = fraction * 100;
+
+    speedFill.style.width = pct + "%";
+    speedThumb.style.left = pct + "%";
+    speedValue.textContent = speed + "%";
+  }
+
+  function pointerToSpeed(clientX) {
+    const rect = speedSlider.getBoundingClientRect();
+
+    if (!rect.width) return;
+
+    const fraction = clamp(
+      (clientX - rect.left) / rect.width,
+      0,
+      1
+    );
+
+    setSpeed(MIN_SPEED + fraction * (MAX_SPEED - MIN_SPEED));
+  }
+
+  /*
+    Slider also never receives keyboard focus.
+    It can be dragged while the text input remains the active element.
+  */
+  speedSlider.addEventListener("pointerdown", event => {
+    event.preventDefault();
+    dragging = true;
+    pointerToSpeed(event.clientX);
+
+    if (speedSlider.setPointerCapture) {
+      speedSlider.setPointerCapture(event.pointerId);
+    }
+  });
+
+  speedSlider.addEventListener("pointermove", event => {
+    if (!dragging) return;
+
+    event.preventDefault();
+    pointerToSpeed(event.clientX);
+  });
+
+  speedSlider.addEventListener("pointerup", event => {
+    dragging = false;
+
+    if (speedSlider.releasePointerCapture) {
+      try {
+        speedSlider.releasePointerCapture(event.pointerId);
+      } catch (_) {}
+    }
+  });
+
+  speedSlider.addEventListener("pointercancel", () => {
+    dragging = false;
+  });
+
+  /*
+    Deliberately NO global tap-to-blur handler anymore.
+    Once the user opens the keyboard, normal interaction with this app
+    assumes the keyboard remains present.
+  */
+
+  if (synth) {
+    loadVoices();
+
+    if (synth.addEventListener) {
+      synth.addEventListener("voiceschanged", loadVoices);
+    }
+  }
+
+  setSpeed(100);
+})();
+</script>
+
+</body>
+</html>
