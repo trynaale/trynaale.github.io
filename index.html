@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>10 вариантов мягкого гашения → белой заливки → гашения</title>
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    margin: 0;
+    background: #000;
+    color: #fff;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", Arial, sans-serif;
+  }
+  body { padding: 18px; }
+  h1 {
+    margin: 0 0 8px;
+    font-size: 20px;
+    font-weight: 700;
+    text-align: center;
+  }
+  .sub {
+    margin: 0 0 18px;
+    color: rgba(255,255,255,.65);
+    text-align: center;
+    font-size: 12px;
+    line-height: 1.4;
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+  }
+  .card {
+    border: 1px solid rgba(255,255,255,.26);
+    border-radius: 18px;
+    background: linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.02));
+    padding: 10px 10px 12px;
+  }
+  .top {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-bottom: 8px;
+    gap: 10px;
+  }
+  .num { font-size: 15px; font-weight: 700; }
+  .desc {
+    font-size: 10px;
+    color: rgba(255,255,255,.58);
+    text-align: right;
+    line-height: 1.25;
+  }
+  .stage {
+    aspect-ratio: 1 / 1;
+    width: 100%;
+    border: 1px solid rgba(255,255,255,.55);
+    position: relative;
+    overflow: hidden;
+    background: rgba(255,255,255,.02);
+  }
+  .line-v, .line-h {
+    position: absolute;
+    background: rgba(255,255,255,.12);
+    z-index: 0;
+  }
+  .line-v { width: 1px; top: 0; bottom: 0; left: 50%; transform: translateX(-.5px); }
+  .line-h { height: 1px; left: 0; right: 0; top: 50%; transform: translateY(-.5px); }
+
+  svg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+  }
+
+  .stroke-layer path {
+    fill: none;
+    stroke: #fff;
+    stroke-width: 10;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    vector-effect: non-scaling-stroke;
+    opacity: 0;
+  }
+
+  .ghost-layer path {
+    fill: none;
+    stroke: rgba(255,255,255,.16);
+    stroke-width: 10;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    vector-effect: non-scaling-stroke;
+  }
+
+  .flash-layer {
+    opacity: 0;
+    transition: opacity 0s linear;
+  }
+
+  .flash-layer path {
+    fill: none;
+    stroke: #fff;
+    stroke-width: 10;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    vector-effect: non-scaling-stroke;
+  }
+
+  .tap {
+    margin-top: 8px;
+    text-align: center;
+    font-size: 10px;
+    color: rgba(255,255,255,.45);
+  }
+
+  @media (max-width: 640px) {
+    body { padding: 12px; }
+    .grid { gap: 10px; }
+    .card { padding: 8px 8px 10px; border-radius: 16px; }
+    .num { font-size: 14px; }
+    .desc { font-size: 9px; }
+  }
+</style>
+</head>
+<body>
+  <h1>10 вариантов нужной анимации</h1>
+  <p class="sub">Схема у всех одинаковая: <b>прорисовался полностью → плавно погас → плавно весь залился в чистый белый → снова плавно погас → началась новая прорисовка</b>.<br>Нажатие на окно перезапускает только его.</p>
+
+  <div class="grid" id="grid"></div>
+
+<script>
+(() => {
+  const configs = [
+    { id: 1, label: 'коротко, мягко', drawStep: 220, fade1: 170, fillIn: 150, fade2: 180, holdWhite: 20, lowA: 0.00, highA: 1.00, ease1: 'ease-in-out', ease2: 'ease-in', ease3: 'ease-out' },
+    { id: 2, label: 'чуть заметнее', drawStep: 220, fade1: 200, fillIn: 175, fade2: 210, holdWhite: 25, lowA: 0.00, highA: 1.00, ease1: 'ease-in-out', ease2: 'ease-in-out', ease3: 'ease-in-out' },
+    { id: 3, label: 'быстрый белый пик', drawStep: 210, fade1: 180, fillIn: 120, fade2: 190, holdWhite: 40, lowA: 0.00, highA: 1.00, ease1: 'ease-in', ease2: 'ease-out', ease3: 'ease-in' },
+    { id: 4, label: 'самый плавный', drawStep: 235, fade1: 220, fillIn: 210, fade2: 230, holdWhite: 15, lowA: 0.00, highA: 1.00, ease1: 'ease', ease2: 'ease', ease3: 'ease' },
+    { id: 5, label: 'мягкий, но яркий', drawStep: 220, fade1: 170, fillIn: 180, fade2: 180, holdWhite: 55, lowA: 0.00, highA: 1.00, ease1: 'ease-in-out', ease2: 'ease-out', ease3: 'ease-in-out' },
+    { id: 6, label: 'с остаточным свечением', drawStep: 215, fade1: 190, fillIn: 165, fade2: 215, holdWhite: 30, lowA: 0.05, highA: 1.00, ease1: 'ease-in-out', ease2: 'ease-in-out', ease3: 'ease-in-out', glow: true },
+    { id: 7, label: 'почти незаметный первый уход', drawStep: 230, fade1: 135, fillIn: 185, fade2: 215, holdWhite: 28, lowA: 0.10, highA: 1.00, ease1: 'linear', ease2: 'ease-out', ease3: 'ease-in-out' },
+    { id: 8, label: 'очень чистый цикл', drawStep: 225, fade1: 205, fillIn: 165, fade2: 205, holdWhite: 10, lowA: 0.00, highA: 1.00, ease1: 'ease-in-out', ease2: 'linear', ease3: 'ease-in-out' },
+    { id: 9, label: 'чуть длиннее белая заливка', drawStep: 220, fade1: 180, fillIn: 180, fade2: 205, holdWhite: 85, lowA: 0.00, highA: 1.00, ease1: 'ease-in-out', ease2: 'ease-in', ease3: 'ease-in-out' },
+    { id: 10, label: 'самый выраженный', drawStep: 210, fade1: 210, fillIn: 210, fade2: 240, holdWhite: 35, lowA: 0.00, highA: 1.00, ease1: 'ease', ease2: 'ease', ease3: 'ease' }
+  ];
+
+  // Simplified stroke decomposition for 林
+  const strokes = [
+    "M88 62 L88 214",      // 木 left vertical
+    "M56 95 L120 100",     // 木 left top horizontal
+    "M68 140 L125 128",    // 木 left middle
+    "M90 148 L55 206",     // 木 left left-falling
+    "M90 148 L132 207",    // 木 left right-falling
+    "M170 62 L170 214",    // 木 right vertical
+    "M140 95 L205 100",    // 木 right top horizontal
+    "M148 140 L208 129",   // 木 right middle
+    "M172 148 L136 206",   // 木 right left-falling
+    "M172 148 L214 207"    // 木 right right-falling
+  ];
+
+  const grid = document.getElementById('grid');
+
+  function buildCard(cfg) {
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.innerHTML = `
+      <div class="top">
+        <div class="num">Вариант ${cfg.id}</div>
+        <div class="desc">${cfg.label}</div>
+      </div>
+      <div class="stage">
+        <div class="line-v"></div>
+        <div class="line-h"></div>
+
+        <svg viewBox="0 0 260 260" class="ghost-layer" aria-hidden="true">
+          ${strokes.map(d => `<path d="${d}"/>`).join('')}
+        </svg>
+
+        <svg viewBox="0 0 260 260" class="stroke-layer">
+          ${strokes.map(d => `<path d="${d}"/>`).join('')}
+        </svg>
+
+        <svg viewBox="0 0 260 260" class="flash-layer">
+          ${strokes.map(d => `<path d="${d}"/>`).join('')}
+        </svg>
+      </div>
+      <div class="tap">тап по окну — перезапуск</div>
+    `;
+    grid.appendChild(card);
+    return card;
+  }
+
+  function wait(ms) {
+    return new Promise(r => setTimeout(r, ms));
+  }
+
+  function transitionOpacity(el, target, duration, easing = 'linear') {
+    return new Promise(resolve => {
+      el.style.transition = `opacity ${duration}ms ${easing}`;
+      requestAnimationFrame(() => {
+        el.style.opacity = String(target);
+        setTimeout(resolve, duration + 20);
+      });
+    });
+  }
+
+  function preparePaths(svg) {
+    const paths = [...svg.querySelectorAll('path')];
+    paths.forEach(p => {
+      const len = p.getTotalLength();
+      p.style.strokeDasharray = `${len}`;
+      p.style.strokeDashoffset = `${len}`;
+      p.style.opacity = '1';
+    });
+    return paths;
+  }
+
+  function resetStrokeLayer(svg) {
+    const paths = preparePaths(svg);
+    paths.forEach(p => {
+      const len = p.getTotalLength();
+      p.style.transition = 'none';
+      p.style.strokeDashoffset = `${len}`;
+      p.style.opacity = '0';
+    });
+  }
+
+  async function drawStroke(path, duration) {
+    const len = path.getTotalLength();
+    path.style.transition = 'none';
+    path.style.strokeDasharray = `${len}`;
+    path.style.strokeDashoffset = `${len}`;
+    path.style.opacity = '1';
+    void path.getBoundingClientRect();
+    path.style.transition = `stroke-dashoffset ${duration}ms ease`;
+    path.style.strokeDashoffset = '0';
+    await wait(duration + 16);
+  }
+
+  function initFlashStyle(flashSvg, cfg) {
+    flashSvg.style.opacity = '0';
+    flashSvg.style.filter = cfg.glow ? 'drop-shadow(0 0 6px rgba(255,255,255,.35))' : 'none';
+  }
+
+  class Demo {
+    constructor(card, cfg) {
+      this.card = card;
+      this.cfg = cfg;
+      this.strokeSvg = card.querySelector('.stroke-layer');
+      this.flashSvg = card.querySelector('.flash-layer');
+      this.strokePaths = [...this.strokeSvg.querySelectorAll('path')];
+      this.runId = 0;
+      this.running = false;
+      resetStrokeLayer(this.strokeSvg);
+      initFlashStyle(this.flashSvg, cfg);
+      card.querySelector('.stage').addEventListener('click', () => this.restart());
+      this.start();
+    }
+
+    restart() {
+      this.runId++;
+      this.start();
+    }
+
+    async start() {
+      const token = ++this.runId;
+      this.running = true;
+      resetStrokeLayer(this.strokeSvg);
+      this.flashSvg.style.transition = 'none';
+      this.flashSvg.style.opacity = '0';
+      await wait(30);
+
+      while (token === this.runId) {
+        resetStrokeLayer(this.strokeSvg);
+        this.flashSvg.style.transition = 'none';
+        this.flashSvg.style.opacity = '0';
+
+        for (const p of this.strokePaths) {
+          if (token !== this.runId) return;
+          await drawStroke(p, this.cfg.drawStep);
+          await wait(28);
+        }
+
+        if (token !== this.runId) return;
+        // 1) fully drawn glyph softly fades out
+        await transitionOpacity(this.strokeSvg, this.cfg.lowA, this.cfg.fade1, this.cfg.ease1);
+        if (token !== this.runId) return;
+
+        // 2) whole glyph smoothly fills to pure white
+        this.flashSvg.style.opacity = String(this.cfg.lowA);
+        await transitionOpacity(this.flashSvg, this.cfg.highA, this.cfg.fillIn, this.cfg.ease2);
+        if (token !== this.runId) return;
+        if (this.cfg.holdWhite > 0) await wait(this.cfg.holdWhite);
+
+        // 3) white fill softly fades out
+        await transitionOpacity(this.flashSvg, 0, this.cfg.fade2, this.cfg.ease3);
+        if (token !== this.runId) return;
+
+        // reset for next draw cycle
+        this.strokeSvg.style.transition = 'none';
+        this.strokeSvg.style.opacity = '1';
+        await wait(40);
+      }
+    }
+  }
+
+  configs.forEach(cfg => new Demo(buildCard(cfg), cfg));
+})();
+</script>
+</body>
+</html>
