@@ -1,0 +1,1401 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Chinese Listener</title>
+
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="听">
+<meta name="theme-color" content="#000000">
+
+<style>
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html,
+body {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  min-height: 100%;
+  background: #000;
+  color: #fff;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display",
+    "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
+}
+
+body {
+  min-height: 100dvh;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+input {
+  font: inherit;
+}
+
+/*
+  IMPORTANT:
+  The whole working UI is pinned to the TOP of the screen.
+  Nothing is positioned relative to the bottom or 50% of viewport height,
+  so opening the iPhone keyboard does not pull the controls into it.
+*/
+.workspace {
+  position: fixed;
+  left: 22px;
+  right: 22px;
+  top: calc(env(safe-area-inset-top) + 34px);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  z-index: 2;
+}
+
+/* SPEED FIRST */
+.speed-box {
+  width: 100%;
+  padding: 14px 15px 12px;
+  border: 1px solid rgba(255,255,255,.72);
+  border-radius: 14px;
+  background: rgba(255,255,255,.06);
+}
+
+.speed-head,
+.speed-scale {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.speed-head {
+  margin-bottom: 10px;
+  font-size: 14px;
+}
+
+#speedValue {
+  color: rgba(255,255,255,.52);
+  font-variant-numeric: tabular-nums;
+}
+
+.speed-scale {
+  margin-top: 5px;
+  color: rgba(255,255,255,.35);
+  font-size: 10px;
+}
+
+.speed-slider {
+  height: 28px;
+  display: flex;
+  align-items: center;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.speed-track {
+  position: relative;
+  width: 100%;
+  height: 2px;
+  border-radius: 999px;
+  background: rgba(255,255,255,.45);
+}
+
+.speed-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 2px;
+  border-radius: 999px;
+  background: rgba(255,255,255,.9);
+}
+
+.speed-thumb {
+  position: absolute;
+  left: 100%;
+  top: 50%;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #fff;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+/* REPEAT SECOND */
+.repeat {
+  width: 100%;
+  min-height: 56px;
+  border: 1px solid rgba(255,255,255,.72);
+  border-radius: 14px;
+  background: rgba(255,255,255,.06);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  -webkit-user-select: none;
+  user-select: none;
+  touch-action: manipulation;
+}
+
+.repeat.active {
+  background: #fff;
+  color: #000;
+  border-color: #fff;
+}
+
+.repeat-icon {
+  font-size: 21px;
+  line-height: 1;
+}
+
+/* TEXT INPUT LAST */
+.input-zone {
+  width: 100%;
+}
+
+#word {
+  display: block;
+  width: 100%;
+  height: 66px;
+  padding: 0 18px;
+  border: 1.5px solid #fff;
+  border-radius: 15px;
+  outline: none;
+  background: transparent;
+  color: #fff;
+  font-size: 25px;
+  line-height: 1;
+  text-align: center;
+  caret-color: #fff;
+  box-shadow: none;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+#word::placeholder {
+  color: rgba(255,255,255,.27);
+}
+
+#word:focus {
+  border-width: 2px;
+}
+
+.hint {
+  min-height: 17px;
+  margin: 9px 4px 0;
+  color: rgba(255,255,255,.52);
+  text-align: center;
+  font-size: 12px;
+}
+
+
+.train-link-wrap {
+  min-height: 18px;
+  margin-top: 7px;
+  text-align: center;
+}
+
+.train-link {
+  display: inline-block;
+  max-width: 100%;
+  color: rgba(255,255,255,.72);
+  font-size: 12px;
+  line-height: 18px;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.train-link:active {
+  color: #fff;
+}
+
+.train-link[hidden] {
+  display: none;
+}
+
+.char-train-link-wrap {
+  width: var(--hanzi-size);
+  min-height: 18px;
+  margin-top: -1px;
+  text-align: center;
+}
+
+/*
+  Intentionally empty lower half.
+  On the user's iPhone, keyboard + accessory bar occupy about 43%
+  of the physical screen from the bottom.
+*/
+.keyboard-reserved-space {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 45vh;
+  pointer-events: none;
+}
+
+/* Compact fallback for shorter iPhones */
+@media (max-height: 700px) {
+  .workspace {
+    top: calc(env(safe-area-inset-top) + 18px);
+    gap: 12px;
+  }
+
+  .speed-box {
+    padding-top: 10px;
+    padding-bottom: 9px;
+  }
+
+  .repeat {
+    min-height: 50px;
+  }
+
+  #word {
+    height: 60px;
+  }
+}
+
+
+/* ===== v7: HANZI STROKE PLAYER ===== */
+:root { --hanzi-size: 240px; }
+
+/* Compact the upper controls so the writing square also remains visible
+   while the iPhone keyboard is open. */
+.workspace {
+  top: calc(env(safe-area-inset-top) + 16px);
+  gap: 10px;
+}
+.speed-box { padding: 10px 13px 8px; }
+.speed-head { margin-bottom: 5px; }
+.speed-slider { height: 23px; }
+.speed-scale { margin-top: 2px; }
+.repeat { min-height: 49px; }
+#word { height: 59px; }
+.hint { min-height: 12px; height: 12px; margin-top: 4px; font-size: 10px; }
+
+.stroke-section {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.hanzi-grid {
+  position: relative;
+  width: var(--hanzi-size);
+  height: var(--hanzi-size);
+  flex: 0 0 var(--hanzi-size);
+  border: 1.25px solid rgba(255,255,255,.72);
+  background: rgba(255,255,255,.025);
+  overflow: hidden;
+}
+
+.grid-v, .grid-h {
+  position: absolute;
+  z-index: 0;
+  background: rgba(255,255,255,.15);
+  pointer-events: none;
+}
+.grid-v { top: 0; bottom: 0; left: 50%; width: 1px; transform: translateX(-.5px); }
+.grid-h { left: 0; right: 0; top: 50%; height: 1px; transform: translateY(-.5px); }
+
+#hanziTarget { position: absolute; inset: 0; z-index: 1; }
+.hanzi-fallback {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: none;
+  place-items: center;
+  font-family: "Songti SC", "STSong", serif;
+  font-size: calc(var(--hanzi-size) * .62);
+  color: rgba(255,255,255,.92);
+}
+
+.stroke-nav {
+  height: 45px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 22px;
+}
+
+.stroke-button {
+  width: 45px;
+  height: 45px;
+  border: 1.2px solid rgba(255,255,255,.72);
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  background: rgba(255,255,255,.045);
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
+}
+.stroke-button.primary { border-width: 1.5px; }
+.stroke-button.disabled { opacity: .22; }
+.stroke-button svg { width: 22px; height: 22px; display: block; }
+.stroke-button.primary svg { width: 21px; height: 21px; }
+
+.stroke-empty #hanziTarget { opacity: 0; }
+.stroke-empty .hanzi-grid { border-color: rgba(255,255,255,.3); }
+.stroke-empty .grid-v, .stroke-empty .grid-h { background: rgba(255,255,255,.08); }
+
+body.keyboard-open .workspace {
+  top: calc(env(safe-area-inset-top) + 4px);
+  gap: 6px;
+}
+body.keyboard-open .speed-box { padding: 6px 11px 4px; }
+body.keyboard-open .speed-head { margin-bottom: 1px; font-size: 12px; }
+body.keyboard-open .speed-slider { height: 19px; }
+body.keyboard-open .speed-scale { margin-top: 0; font-size: 8px; }
+body.keyboard-open .repeat { min-height: 43px; }
+body.keyboard-open #word { height: 53px; }
+body.keyboard-open .hint { min-height: 7px; height: 7px; margin-top: 1px; font-size: 8px; }
+body.keyboard-open .stroke-section { gap: 5px; }
+body.keyboard-open .stroke-nav { height: 38px; gap: 18px; }
+body.keyboard-open .stroke-button { width: 38px; height: 38px; }
+body.keyboard-open .stroke-button svg,
+body.keyboard-open .stroke-button.primary svg { width: 18px; height: 18px; }
+
+
+/* v9: Pronunciation of the selected Hanzi with independent rate. */
+.char-voice {
+  display: grid;
+  grid-template-columns: 39px minmax(0,1fr);
+  align-items: center;
+  gap: 11px;
+  width: min(300px, 100%);
+  min-height: 48px;
+  padding: 1px 2px;
+}
+.char-voice[hidden] { display: none; }
+.char-audio-play {
+  width: 39px;
+  height: 39px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(255,255,255,.72);
+  border-radius: 50%;
+  background: rgba(255,255,255,.06);
+  color: #fff;
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
+}
+.char-audio-play svg { width: 18px; height: 18px; fill: currentColor; }
+.char-audio-play.active { background: #fff; color:#000; }
+.char-voice-right { min-width: 0; }
+.char-voice-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 5px;
+}
+.char-pinyin {
+  font-size: 14px;
+  font-weight: 500;
+  color: #fff;
+  white-space: nowrap;
+}
+.char-rate-value {
+  font-size: 12px;
+  color: rgba(255,255,255,.65);
+  font-variant-numeric: tabular-nums;
+}
+.char-rate-slider {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  height: 20px;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+.char-rate-track { width: 100%; height: 2px; position: relative; background: rgba(255,255,255,.4); }
+.char-rate-fill { height: 2px; width: 100%; position: absolute; left:0; top:0; background:#fff; }
+.char-rate-thumb {
+  position: absolute; left:100%; top:50%; width:16px; height:16px;
+  border-radius:50%; background:#fff; transform:translate(-50%,-50%); pointer-events:none;
+}
+body.keyboard-open .char-voice { min-height: 36px; grid-template-columns: 32px minmax(0,1fr); gap:8px; }
+body.keyboard-open .char-audio-play { width:32px; height:32px; }
+body.keyboard-open .char-audio-play svg { width:15px; height:15px; }
+body.keyboard-open .char-pinyin { font-size:12px; }
+body.keyboard-open .char-voice-header { margin-bottom:1px; }
+body.keyboard-open .char-rate-slider { height:14px; }
+body.keyboard-open .char-rate-thumb { width:14px; height:14px; }
+body.keyboard-open .stroke-section { gap:3px; }
+body.keyboard-open .stroke-nav { height:34px; }
+body.keyboard-open .stroke-button { width:34px; height:34px; }
+body.keyboard-open .stroke-button svg,
+body.keyboard-open .stroke-button.primary svg { width:16px; height:16px; }
+
+/* v10: Pinyin adjacent to both pronunciation players. */
+.repeat-action {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  gap: 9px;
+  white-space: nowrap;
+  flex: 0 0 auto;
+}
+.repeat.has-pinyin {
+  justify-content: flex-start;
+  padding: 0 13px;
+  gap: 12px;
+}
+.repeat-pinyin {
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: 100%;
+  padding-left: 11px;
+  border-left: 1px solid rgba(255,255,255,.24);
+  color: rgba(255,255,255,.9);
+  font-size: 15px;
+  line-height: 1.45;
+  text-align: left;
+  white-space: nowrap;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-x;
+  -webkit-user-select: text;
+  user-select: text;
+  cursor: text;
+  font-variant-numeric: normal;
+}
+.repeat-pinyin::-webkit-scrollbar { display: none; }
+.repeat-pinyin[hidden] { display: none; }
+.repeat.active .repeat-pinyin {
+  color: #000;
+  border-left-color: rgba(0,0,0,.25);
+}
+.char-pinyin { font-size: 16px; font-weight: 600; }
+body.keyboard-open .repeat.has-pinyin { gap: 8px; padding: 0 9px; }
+body.keyboard-open .repeat-pinyin { font-size: 13px; padding-left: 8px; }
+body.keyboard-open .char-pinyin { font-size: 14px; }
+@media (max-width: 360px) {
+  .repeat-pinyin { font-size: 13px; }
+  .repeat.has-pinyin { gap: 8px; padding: 0 9px; }
+}
+
+</style>
+</head>
+
+<body>
+
+<div class="workspace">
+  <div class="speed-box">
+    <div class="speed-head">
+      <span>Скорость</span>
+      <span id="speedValue">100%</span>
+    </div>
+
+    <div class="speed-slider" id="speedSlider">
+      <div class="speed-track">
+        <div class="speed-fill" id="speedFill"></div>
+        <div class="speed-thumb" id="speedThumb"></div>
+      </div>
+    </div>
+
+    <div class="speed-scale">
+      <span>20%</span>
+      <span>100%</span>
+    </div>
+  </div>
+
+  <!-- div instead of button: it does not take focus away from the text input -->
+  <div class="repeat" id="repeatButton">
+    <span class="repeat-action">
+      <span class="repeat-icon">↻</span>
+      <span id="repeatLabel">Повторять</span>
+    </span>
+    <span class="repeat-pinyin" id="wordPinyin" aria-label="Пиньинь введённого текста" hidden></span>
+  </div>
+
+  <div class="input-zone">
+    <input
+      id="word"
+      placeholder="输入中文"
+      autocomplete="off"
+      autocorrect="off"
+      autocapitalize="off"
+      spellcheck="false"
+      enterkeyhint="go"
+      lang="zh-CN"
+    >
+    <div class="train-link-wrap">
+      <a
+        class="train-link"
+        id="wordTrainLink"
+        href="#"
+        target="_blank"
+        rel="noopener noreferrer"
+        hidden
+      ></a>
+    </div>
+    <div class="hint" id="hint"></div>
+  </div>
+
+  <div class="stroke-section stroke-empty" id="strokeSection">
+    <div class="char-voice" id="charVoice" hidden>
+      <div class="char-audio-play" id="charAudioPlay" aria-label="Произнести выбранный иероглиф">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.7v12.6c0 .72.79 1.16 1.4.77l9.05-6.3a.93.93 0 0 0 0-1.54L9.4 4.93A.91.91 0 0 0 8 5.7z"/></svg>
+      </div>
+      <div class="char-voice-right">
+        <div class="char-voice-header">
+          <span class="char-pinyin" id="charPinyin">—</span>
+          <span class="char-rate-value" id="charRateValue">100%</span>
+        </div>
+        <div class="char-rate-slider" id="charRateSlider" aria-label="Скорость произношения иероглифа">
+          <div class="char-rate-track">
+            <div class="char-rate-fill" id="charRateFill"></div>
+            <div class="char-rate-thumb" id="charRateThumb"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="hanzi-grid" id="hanziGrid">
+      <div class="grid-v"></div>
+      <div class="grid-h"></div>
+      <div id="hanziTarget"></div>
+      <div class="hanzi-fallback" id="hanziFallback"></div>
+    </div>
+
+    <div class="char-train-link-wrap">
+      <a
+        class="train-link"
+        id="charTrainLink"
+        href="#"
+        target="_blank"
+        rel="noopener noreferrer"
+        hidden
+      ></a>
+    </div>
+
+    <div class="stroke-nav">
+      <div class="stroke-button disabled" id="prevChar" aria-label="Предыдущий иероглиф">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M15 5l-7 7 7 7"/>
+        </svg>
+      </div>
+
+      <div class="stroke-button primary disabled" id="strokePlay" aria-label="Прорисовка иероглифа">
+        <svg id="playIcon" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M8 5.7v12.6c0 .72.79 1.16 1.4.77l9.05-6.3a.93.93 0 0 0 0-1.54L9.4 4.93A.91.91 0 0 0 8 5.7z"/>
+        </svg>
+        <svg id="pauseIcon" viewBox="0 0 24 24" fill="currentColor" style="display:none">
+          <rect x="7" y="5" width="3.5" height="14" rx="1"/>
+          <rect x="13.5" y="5" width="3.5" height="14" rx="1"/>
+        </svg>
+      </div>
+
+      <div class="stroke-button disabled" id="nextChar" aria-label="Следующий иероглиф">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M9 5l7 7-7 7"/>
+        </svg>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="keyboard-reserved-space" aria-hidden="true"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/hanzi-writer@3.7.3/dist/hanzi-writer.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/pinyin-pro@3.29.4/dist/index.js"></script>
+<!-- The recordings are provided by hugolpz/audio-cmn, Chen Wang, CC BY-SA.
+     https://github.com/hugolpz/audio-cmn -->
+
+<script>
+(() => {
+  "use strict";
+
+  /* Clean up service workers/caches from earlier builds on the same Netlify URL. */
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.getRegistrations()
+      .then(regs => regs.forEach(reg => reg.unregister()))
+      .catch(() => {});
+  }
+
+  if ("caches" in window) {
+    caches.keys()
+      .then(keys => Promise.all(keys.map(key => caches.delete(key))))
+      .catch(() => {});
+  }
+
+  const input = document.getElementById("word");
+  const hint = document.getElementById("hint");
+  const wordTrainLink = document.getElementById("wordTrainLink");
+
+  const repeatButton = document.getElementById("repeatButton");
+  const repeatLabel = document.getElementById("repeatLabel");
+
+  const speedSlider = document.getElementById("speedSlider");
+  const speedFill = document.getElementById("speedFill");
+  const speedThumb = document.getElementById("speedThumb");
+  const speedValue = document.getElementById("speedValue");
+
+  const synth = window.speechSynthesis;
+
+  const REPEAT_DELAY = 1000;
+  const MIN_SPEED = 20;
+  const MAX_SPEED = 100;
+
+  let voices = [];
+  let speed = 100;
+  let repeating = false;
+  let repeatTimer = null;
+  let repeatGeneration = 0;
+  let dragging = false;
+
+  function clamp(v, min, max) {
+    return Math.min(max, Math.max(min, v));
+  }
+
+
+  function trainChineseUrl(text) {
+    return "https://www.trainchinese.com/v2/wordDetails.php?searchWord=" +
+      encodeURIComponent(text) +
+      "&tcLanguage=ru";
+  }
+
+  function updateWordTrainLink() {
+    const text = input.value.trim();
+
+    if (!text) {
+      wordTrainLink.hidden = true;
+      wordTrainLink.removeAttribute("href");
+      wordTrainLink.textContent = "";
+      return;
+    }
+
+    wordTrainLink.href = trainChineseUrl(text);
+    wordTrainLink.textContent = "TrainChinese · " + text;
+    wordTrainLink.hidden = false;
+  }
+
+  function loadVoices() {
+    voices = synth ? synth.getVoices() : [];
+  }
+
+  function mandarinVoice() {
+    if (!voices.length) loadVoices();
+
+    const chinese = v => /^zh/i.test(v.lang || "");
+
+    const han = voices.find(v => {
+      const identity = (v.name || "") + " " + (v.voiceURI || "");
+      return chinese(v) &&
+        /(^|[\s_-])han([\s_-]|$)|漢|汉|х[аa]нь/i.test(identity);
+    });
+
+    if (han) return han;
+
+    return voices.find(v => /^zh[-_]CN$/i.test(v.lang || "")) ||
+           voices.find(v => /^zh[-_]Hans/i.test(v.lang || "")) ||
+           voices.find(chinese) ||
+           null;
+  }
+
+  function stopAudio() {
+    repeatGeneration++;
+    clearTimeout(repeatTimer);
+    repeatTimer = null;
+
+    if (synth && (synth.speaking || synth.pending)) {
+      synth.cancel();
+    }
+  }
+
+  function setRepeatUI(on) {
+    repeating = on;
+    repeatButton.classList.toggle("active", on);
+    repeatLabel.textContent = on ? "Остановить" : "Повторять";
+  }
+
+  function speak(text, done) {
+    const value = text.trim();
+
+    if (!value) {
+      hint.textContent = "Введите китайский текст";
+      if (done) done();
+      return;
+    }
+
+    hint.textContent = "";
+
+    if (!synth || !window.SpeechSynthesisUtterance) {
+      hint.textContent = "Озвучивание недоступно";
+      if (done) done();
+      return;
+    }
+
+    window.dispatchEvent(new Event("full-speech-start"));
+    const utterance = new SpeechSynthesisUtterance(value);
+    const voice = mandarinVoice();
+
+    utterance.lang = voice ? voice.lang : "zh-CN";
+    if (voice) utterance.voice = voice;
+
+    utterance.rate = speed / 100;
+    utterance.pitch = 1;
+    utterance.volume = 1;
+
+    let finished = false;
+
+    const finish = () => {
+      if (finished) return;
+      finished = true;
+      if (done) done();
+    };
+
+    utterance.onend = finish;
+    utterance.onerror = finish;
+
+    synth.cancel();
+    synth.resume();
+    synth.speak(utterance);
+  }
+
+  function speakOnce() {
+    stopAudio();
+    setRepeatUI(false);
+    speak(input.value);
+  }
+
+  function startRepeat() {
+    if (!input.value.trim()) {
+      hint.textContent = "Введите китайский текст";
+      return;
+    }
+
+    stopAudio();
+    setRepeatUI(true);
+
+    const generation = repeatGeneration;
+
+    function cycle() {
+      if (!repeating || generation !== repeatGeneration) return;
+
+      const text = input.value.trim();
+
+      if (!text) {
+        setRepeatUI(false);
+        return;
+      }
+
+      speak(text, () => {
+        if (!repeating || generation !== repeatGeneration) return;
+        repeatTimer = setTimeout(cycle, REPEAT_DELAY);
+      });
+    }
+
+    cycle();
+  }
+
+  function stopRepeat() {
+    setRepeatUI(false);
+    stopAudio();
+  }
+
+  /*
+    Go:
+    speak once, but keep the input focused.
+    preventDefault prevents Enter from triggering any browser-default action.
+  */
+  input.addEventListener("keydown", event => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      speakOnce();
+    }
+  });
+
+  input.addEventListener("input", () => {
+    if (input.value.trim()) {
+      hint.textContent = "";
+    }
+    updateWordTrainLink();
+  });
+
+  /*
+    IMPORTANT FOR THE NEW WORKFLOW:
+    Repeat is a non-focusable DIV.
+    Preventing pointer default means touching it will not steal focus
+    from the input, so the iPhone keyboard stays open.
+  */
+  repeatButton.addEventListener("pointerdown", event => {
+    // Let a long pinyin transcription scroll horizontally without restarting speech.
+    if (event.target.closest("#wordPinyin")) return;
+    event.preventDefault();
+
+    if (repeating) {
+      stopRepeat();
+    } else {
+      startRepeat();
+    }
+  });
+
+  function setSpeed(value) {
+    speed = Math.round(clamp(value, MIN_SPEED, MAX_SPEED) / 5) * 5;
+
+    const fraction = (speed - MIN_SPEED) / (MAX_SPEED - MIN_SPEED);
+    const pct = fraction * 100;
+
+    speedFill.style.width = pct + "%";
+    speedThumb.style.left = pct + "%";
+    speedValue.textContent = speed + "%";
+  }
+
+  function pointerToSpeed(clientX) {
+    const rect = speedSlider.getBoundingClientRect();
+
+    if (!rect.width) return;
+
+    const fraction = clamp(
+      (clientX - rect.left) / rect.width,
+      0,
+      1
+    );
+
+    setSpeed(MIN_SPEED + fraction * (MAX_SPEED - MIN_SPEED));
+  }
+
+  /*
+    Slider also never receives keyboard focus.
+    It can be dragged while the text input remains the active element.
+  */
+  speedSlider.addEventListener("pointerdown", event => {
+    event.preventDefault();
+    dragging = true;
+    pointerToSpeed(event.clientX);
+
+    if (speedSlider.setPointerCapture) {
+      speedSlider.setPointerCapture(event.pointerId);
+    }
+  });
+
+  speedSlider.addEventListener("pointermove", event => {
+    if (!dragging) return;
+
+    event.preventDefault();
+    pointerToSpeed(event.clientX);
+  });
+
+  speedSlider.addEventListener("pointerup", event => {
+    dragging = false;
+
+    if (speedSlider.releasePointerCapture) {
+      try {
+        speedSlider.releasePointerCapture(event.pointerId);
+      } catch (_) {}
+    }
+  });
+
+  speedSlider.addEventListener("pointercancel", () => {
+    dragging = false;
+  });
+
+  /*
+    Deliberately NO global tap-to-blur handler anymore.
+    Once the user opens the keyboard, normal interaction with this app
+    assumes the keyboard remains present.
+  */
+
+  if (synth) {
+    loadVoices();
+
+    if (synth.addEventListener) {
+      synth.addEventListener("voiceschanged", loadVoices);
+    }
+  }
+
+  window.addEventListener("char-audio-start", () => {
+    if (repeating) stopRepeat();
+    else stopAudio();
+  });
+
+  setSpeed(100);
+  updateWordTrainLink();
+})();
+</script>
+
+
+<script>
+(() => {
+  "use strict";
+
+  const input = document.getElementById("word");
+  const strokeSection = document.getElementById("strokeSection");
+  const hanziTarget = document.getElementById("hanziTarget");
+  const hanziFallback = document.getElementById("hanziFallback");
+  const charTrainLink = document.getElementById("charTrainLink");
+  const charVoice = document.getElementById("charVoice");
+  const charAudioPlay = document.getElementById("charAudioPlay");
+  const charPinyin = document.getElementById("charPinyin");
+  const wordPinyin = document.getElementById("wordPinyin");
+  const repeatButton = document.getElementById("repeatButton");
+  const charRateSlider = document.getElementById("charRateSlider");
+  const charRateFill = document.getElementById("charRateFill");
+  const charRateThumb = document.getElementById("charRateThumb");
+  const charRateValue = document.getElementById("charRateValue");
+  const prevChar = document.getElementById("prevChar");
+  const nextChar = document.getElementById("nextChar");
+  const strokePlay = document.getElementById("strokePlay");
+  const playIcon = document.getElementById("playIcon");
+  const pauseIcon = document.getElementById("pauseIcon");
+
+  let chars = [];
+  let charIndex = 0;
+  let writer = null;
+  let writerFailed = false;
+  let strokeState = "idle"; // idle | playing | paused | complete
+  let animationToken = 0;
+  let gridSize = 220;
+  let charRate = 100;
+  let draggingCharRate = false;
+  let contextualReadings = [];
+  const charAudio = new Audio();
+  charAudio.preload = "none";
+  let audioStamp = 0;
+
+
+  const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
+
+
+  function trainChineseUrl(text) {
+    return "https://www.trainchinese.com/v2/wordDetails.php?searchWord=" +
+      encodeURIComponent(text) +
+      "&tcLanguage=ru";
+  }
+
+  function updateCharTrainLink() {
+    const ch = chars[charIndex] || "";
+
+    if (!ch) {
+      charTrainLink.hidden = true;
+      charTrainLink.removeAttribute("href");
+      charTrainLink.textContent = "";
+      return;
+    }
+
+    charTrainLink.href = trainChineseUrl(ch);
+    charTrainLink.textContent = "TrainChinese · " + ch;
+    charTrainLink.hidden = false;
+  }
+
+
+  /*
+   * Pronunciation is determined from the whole expression, not from an
+   * isolated Hanzi. pinyin-pro resolves many polyphonic characters and
+   * supports yi/bu + adjacent third-tone sandhi. The result is used to
+   * choose a recording of the corresponding tone-specific Mandarin syllable.
+   */
+  function contextualPinyin(text) {
+    if (!window.pinyinPro || !window.pinyinPro.pinyin) return [];
+    try {
+      const result = window.pinyinPro.pinyin(text, {
+        type: "array", toneType: "num", nonZh: "removed",
+        toneSandhi: { yi: true, bu: true, thirdTone: true }
+      });
+      return Array.isArray(result) ? result : [];
+    } catch (_) { return []; }
+  }
+
+  function syllableInfo(raw) {
+    // mp3 corpus uses ASCII spelling, including v for ü and 5 for neutral.
+    const code = String(raw || "")
+      .toLowerCase().replaceAll("ü", "v").replaceAll("u:", "v")
+      .replace(/[^a-zv0-5]/g, "");
+    if (!code) return null;
+    const m = code.match(/^([a-zv]+)([0-5])?$/);
+    if (!m) return null;
+    return { name: m[1], tone: m[2] === "0" ? "5" : (m[2] || "5") };
+  }
+
+  const toneMarks = {
+    a:["a","ā","á","ǎ","à"], e:["e","ē","é","ě","è"],
+    i:["i","ī","í","ǐ","ì"], o:["o","ō","ó","ǒ","ò"],
+    u:["u","ū","ú","ǔ","ù"], v:["ü","ǖ","ǘ","ǚ","ǜ"]
+  };
+  function markedPinyin(raw) {
+    const info = syllableInfo(raw);
+    if (!info) return "—";
+    const base = info.name.replaceAll("v", "ü");
+    const tone = Number(info.tone);
+    if (tone === 5 || !tone) return base;
+    let pos = base.indexOf("a");
+    if (pos < 0) pos = base.indexOf("e");
+    if (pos < 0 && base.includes("ou")) pos = base.indexOf("o");
+    if (pos < 0) {
+      for (let i = base.length-1; i >= 0; i--) {
+        if ("aeiouü".includes(base[i])) { pos = i; break; }
+      }
+    }
+    if (pos < 0) return base;
+    const vowel = base[pos] === "ü" ? "v" : base[pos];
+    const marked = toneMarks[vowel];
+    if (!marked) return base;
+    return base.slice(0,pos) + marked[tone] + base.slice(pos+1);
+  }
+
+  function updateWordPinyin() {
+    const text = input.value;
+    let readIndex = 0;
+    const parts = [];
+    let nonHan = "";
+
+    const flushNonHan = () => {
+      const piece = nonHan.trim();
+      if (piece) parts.push(piece);
+      nonHan = "";
+    };
+
+    for (const ch of Array.from(text)) {
+      if (isHan(ch)) {
+        flushNonHan();
+        const raw = contextualReadings[readIndex++] || "";
+        parts.push(raw ? markedPinyin(raw) : ch);
+      } else {
+        nonHan += ch;
+      }
+    }
+    flushNonHan();
+
+    const result = parts.join(" ")
+      .replace(/\s+([，。！？、；：,.!?;:])/g, "$1")
+      .trim();
+
+    const hasChinese = Array.from(text).some(isHan);
+    const ready = Boolean(result) && hasChinese;
+    repeatButton.classList.toggle("has-pinyin", ready);
+    wordPinyin.hidden = !ready;
+    wordPinyin.textContent = ready ? result : "";
+    wordPinyin.title = ready ? result : "";
+    wordPinyin.scrollLeft = 0;
+  }
+
+  function stopCharAudio() {
+    audioStamp++;
+    charAudio.pause();
+    try { charAudio.currentTime = 0; } catch (_) {}
+    charAudioPlay.classList.remove("active");
+  }
+
+  function refreshPronunciation() {
+    const has = chars.length > 0;
+    charVoice.hidden = !has;
+    stopCharAudio();
+    if (!has) return;
+    const raw = contextualReadings[charIndex] || "";
+    charPinyin.textContent = raw ? markedPinyin(raw) : "—";
+    charPinyin.title = raw ? "Контекстное чтение: " + markedPinyin(raw) : "Чтение недоступно";
+  }
+
+  function playSelectedHanzi() {
+    if (!chars.length) return;
+    stopCharAudio();
+    const stamp = audioStamp;
+    window.dispatchEvent(new Event("char-audio-start"));
+    const info = syllableInfo(contextualReadings[charIndex]);
+    if (!info) {
+      charPinyin.textContent = "Нет транскрипции";
+      return;
+    }
+    // The corpus omitted neutral-tone (5) clips because they duplicated tone-1
+    // recordings. Use that available approximation, and keep the written pinyin
+    // neutral so learners can distinguish the underlying tone context.
+    const audioTone = info.tone === "5" ? "1" : info.tone;
+    const fileName = "cmn-" + info.name + audioTone + ".mp3";
+    charAudio.src = "https://cdn.jsdelivr.net/gh/hugolpz/audio-cmn@master/64k/syllabs/" + fileName;
+    charAudio.playbackRate = charRate / 100;
+    if ("preservesPitch" in charAudio) charAudio.preservesPitch = true;
+    charAudioPlay.classList.add("active");
+    const p = charAudio.play();
+    if (p && p.catch) p.catch(() => {
+      if (stamp !== audioStamp) return;
+      charAudioPlay.classList.remove("active");
+      charPinyin.title = "Не удалось загрузить запись. Проверьте соединение.";
+    });
+  }
+  charAudio.addEventListener("ended", () => charAudioPlay.classList.remove("active"));
+  charAudio.addEventListener("error", () => charAudioPlay.classList.remove("active"));
+  window.addEventListener("full-speech-start", stopCharAudio);
+  charAudioPlay.addEventListener("pointerdown", e => {
+    e.preventDefault();
+    playSelectedHanzi();
+  });
+
+  function setCharRate(value) {
+    charRate = Math.round(clamp(value, 20, 100)/5)*5;
+    const progress = (charRate - 20)/80 * 100;
+    charRateFill.style.width = progress + "%";
+    charRateThumb.style.left = progress + "%";
+    charRateValue.textContent = charRate + "%";
+    charAudio.playbackRate = charRate/100;
+  }
+  function setCharRateAt(x) {
+    const r = charRateSlider.getBoundingClientRect();
+    if (r.width) setCharRate(20 + 80*clamp((x-r.left)/r.width,0,1));
+  }
+  charRateSlider.addEventListener("pointerdown", e => {
+    e.preventDefault(); draggingCharRate = true; setCharRateAt(e.clientX);
+    charRateSlider.setPointerCapture?.(e.pointerId);
+  });
+  charRateSlider.addEventListener("pointermove", e => {
+    if (draggingCharRate) { e.preventDefault(); setCharRateAt(e.clientX); }
+  });
+  charRateSlider.addEventListener("pointerup", e => {
+    draggingCharRate = false;
+    try { charRateSlider.releasePointerCapture?.(e.pointerId); } catch (_) {}
+  });
+  charRateSlider.addEventListener("pointercancel", () => { draggingCharRate = false; });
+
+  function isHan(ch) {
+    try { return /\p{Script=Han}/u.test(ch); }
+    catch (_) { return /[\u3400-\u4DBF\u4E00-\u9FFF\uF900-\uFAFF]/.test(ch); }
+  }
+
+  function extractHan(text) {
+    return Array.from(text || "").filter(isHan);
+  }
+
+  function showPlay() {
+    playIcon.style.display = "";
+    pauseIcon.style.display = "none";
+  }
+
+  function showPause() {
+    playIcon.style.display = "none";
+    pauseIcon.style.display = "";
+  }
+
+  function updateButtons() {
+    const has = chars.length > 0;
+    strokeSection.classList.toggle("stroke-empty", !has);
+    strokePlay.classList.toggle("disabled", !has);
+    prevChar.classList.toggle("disabled", !has || charIndex <= 0);
+    nextChar.classList.toggle("disabled", !has || charIndex >= chars.length - 1);
+    updateCharTrainLink();
+    // The selected character changes with navigation, so does its reading.
+    // Avoid stopping audio on unrelated layout calls by refreshing only on selection.
+  }
+
+  function resetPlayerState() {
+    animationToken++;
+    strokeState = "idle";
+    showPlay();
+  }
+
+  function showFallback(ch) {
+    hanziFallback.textContent = ch || "";
+    hanziFallback.style.display = ch ? "grid" : "none";
+  }
+
+  function hideFallback() {
+    hanziFallback.style.display = "none";
+  }
+
+  function loadCharacter(ch) {
+    resetPlayerState();
+    writerFailed = false;
+    hideFallback();
+
+    if (!ch) return;
+
+    if (!window.HanziWriter) {
+      writerFailed = true;
+      showFallback(ch);
+      return;
+    }
+
+    try {
+      if (!writer) {
+        writer = HanziWriter.create("hanziTarget", ch, {
+          width: gridSize,
+          height: gridSize,
+          padding: Math.max(9, Math.round(gridSize * .08)),
+          showOutline: true,
+          showCharacter: false,
+          strokeColor: "#ffffff",
+          outlineColor: "#383838",
+          highlightColor: "#ffffff",
+          strokeAnimationSpeed: 1.2,
+          delayBetweenStrokes: 120,
+          delayBetweenLoops: 420,
+          renderer: "svg",
+          charDataLoader: (character, onComplete, onError) => {
+            fetch("https://cdn.jsdelivr.net/npm/hanzi-writer-data@2.0.1/" + encodeURIComponent(character) + ".json")
+              .then(r => { if (!r.ok) throw new Error("character data"); return r.json(); })
+              .then(onComplete)
+              .catch(err => {
+                writerFailed = true;
+                showFallback(character);
+                if (onError) onError(err);
+              });
+          }
+        });
+      } else {
+        writer.setCharacter(ch);
+      }
+    } catch (_) {
+      writerFailed = true;
+      showFallback(ch);
+    }
+  }
+
+  function renderCurrent() {
+    updateButtons();
+
+    if (!chars.length) {
+      charIndex = 0;
+      refreshPronunciation();
+      resetPlayerState();
+      if (writer) { try { writer.pauseAnimation(); } catch (_) {} }
+      hideFallback();
+      updateButtons();
+      return;
+    }
+
+    charIndex = clamp(charIndex, 0, chars.length - 1);
+    if (writer) { try { writer.pauseAnimation(); } catch (_) {} }
+    loadCharacter(chars[charIndex]);
+    updateButtons();
+    refreshPronunciation();
+  }
+
+  function syncFromInput() {
+    const next = extractHan(input.value);
+    chars = next;
+    contextualReadings = contextualPinyin(input.value);
+    updateWordPinyin();
+    charIndex = clamp(charIndex, 0, Math.max(0, chars.length - 1));
+    renderCurrent();
+    updateLayout();
+  }
+
+  input.addEventListener("input", syncFromInput);
+
+  prevChar.addEventListener("pointerdown", e => {
+    e.preventDefault();
+    if (!chars.length || charIndex <= 0) return;
+    charIndex--;
+    renderCurrent();
+  });
+
+  nextChar.addEventListener("pointerdown", e => {
+    e.preventDefault();
+    if (!chars.length || charIndex >= chars.length - 1) return;
+    charIndex++;
+    renderCurrent();
+  });
+
+  // Starts a continuous loop: every stroke of this Hanzi, then all over again.
+  // HanziWriter retains the exact animation state through pause/resume.
+  function startAnimation() {
+    if (!chars.length || !writer || writerFailed) return;
+    ++animationToken;
+    strokeState = "playing";
+    showPause();
+    try {
+      Promise.resolve(writer.loopCharacterAnimation()).catch(() => {
+        strokeState = "idle";
+        showPlay();
+      });
+    } catch (_) {
+      strokeState = "idle";
+      showPlay();
+    }
+  }
+
+  function pauseAnimation() {
+    if (!writer || strokeState !== "playing") return;
+    try {
+      writer.pauseAnimation();
+      strokeState = "paused";
+      showPlay();
+    } catch (_) {}
+  }
+
+  function resumeAnimation() {
+    if (!writer || strokeState !== "paused") return;
+    try {
+      writer.resumeAnimation();
+      strokeState = "playing";
+      showPause();
+    } catch (_) {}
+  }
+
+  strokePlay.addEventListener("pointerdown", e => {
+    e.preventDefault();
+    if (!chars.length || writerFailed) return;
+
+    if (strokeState === "playing") pauseAnimation();
+    else if (strokeState === "paused") resumeAnimation();
+    else startAnimation();
+  });
+
+  function updateLayout() {
+    const vv = window.visualViewport;
+    const fullH = window.innerHeight;
+    const visibleH = vv ? vv.height : fullH;
+    const keyboardOpen = vv ? visibleH < fullH * .82 : false;
+    document.body.classList.toggle("keyboard-open", keyboardOpen);
+
+    requestAnimationFrame(() => {
+      const visibleBottom = vv ? vv.offsetTop + vv.height : window.innerHeight;
+      const top = strokeSection.getBoundingClientRect().top;
+      const voiceHeight = charVoice.hidden ? 0 : charVoice.getBoundingClientRect().height;
+      const charLinkHeight = document.querySelector(".char-train-link-wrap")?.getBoundingClientRect().height || 0;
+      const navReserve = keyboardOpen ? 45 : 54;
+      const available = visibleBottom - top - voiceHeight - charLinkHeight - navReserve - 20;
+      const maxByWidth = window.innerWidth - 52;
+      const desiredMax = keyboardOpen ? 192 : 300;
+
+      gridSize = Math.floor(clamp(Math.min(available, maxByWidth, desiredMax), 100, desiredMax));
+      document.documentElement.style.setProperty("--hanzi-size", gridSize + "px");
+
+      if (writer) {
+        try {
+          writer.updateDimensions({
+            width: gridSize,
+            height: gridSize,
+            padding: Math.max(9, Math.round(gridSize * .08))
+          });
+        } catch (_) {}
+      }
+    });
+  }
+
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener("resize", updateLayout);
+    window.visualViewport.addEventListener("scroll", updateLayout);
+  }
+  window.addEventListener("resize", updateLayout);
+
+  setCharRate(100);
+  updateButtons();
+  updateWordPinyin();
+  updateLayout();
+  setTimeout(updateLayout, 150);
+})();
+</script>
+
+</body>
+</html>
